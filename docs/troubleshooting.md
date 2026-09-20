@@ -6,11 +6,16 @@ Your `%APPDATA%\Atlas\config.toml` is either corrupt or declares a
 `config_version` newer than this build supports. Back up and remove the
 file to regenerate defaults, or fix the TOML syntax reported in the error.
 
-## `atlas --diagnose` shows a lot of `[WARN] ... Implemented in Phase 2`
+## `atlas --diagnose` shows `[WARN] Speech engine / model` / `[WARN] Wake detector`
 
-Expected in Phase 1. Microphone, speech recognition, wake detection, Win32
-window/monitor control, TTS, and Spotify auth are not implemented yet -
-see `Atlas.md` section 79 for the Phase 2 implementation order.
+No Vosk model was found. Download one into `models/` - see
+`models/README.md` - or set `[speech] model_path` in your config to point
+at an already-downloaded model elsewhere.
+
+## `atlas --diagnose` shows `[WARN] Spotify authentication`
+
+Expected - the Spotify plugin isn't implemented yet (it's optional per
+Atlas.md sections 27/59 and never required for core functionality).
 
 ## A plugin doesn't load
 

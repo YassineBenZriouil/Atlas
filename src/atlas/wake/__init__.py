@@ -1,4 +1,4 @@
-from atlas.wake.detector import WakeDetector
+from atlas.wake.detector import VoskWakeDetector, WakeDetector
 from atlas.wake.wake_controller import WakeController
 
-__all__ = ["WakeController", "WakeDetector"]
+__all__ = ["VoskWakeDetector", "WakeController", "WakeDetector"]

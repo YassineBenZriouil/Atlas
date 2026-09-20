@@ -26,3 +26,11 @@ class SpeechEngine(ABC):
 
     @abstractmethod
     def process_audio(self, audio: bytes) -> RecognitionResult | None: ...
+
+    @abstractmethod
+    def finalize(self) -> RecognitionResult | None:
+        """Force whatever the engine has accumulated so far into a final
+        result, without waiting for it to detect an endpoint on its own.
+        Called when something else (a silence timeout, the wake controller)
+        has already decided the utterance is over."""
+        ...

@@ -10,17 +10,25 @@ contract this project is built against.
 
 ## Status
 
-**Phase 1 - Foundation & Architecture.** The skeleton exists and runs:
-configuration, logging, the command pipeline (parser/registry/dispatcher),
-the state machine, the plugin system, and interfaces for speech/audio/
-Windows integration. Real Vosk recognition, Win32 window/monitor control,
-and the Spotify/browser/filesystem plugins are Phase 2 work.
+**Phase 2 - Functional Implementation.** ATLAS actually does things now:
+real microphone capture, real offline speech recognition and wake-word
+detection (Vosk), real Win32 window/monitor/keyboard/mouse/volume control,
+and a real command set (open/close/focus/switch/minimize/maximize/restore
+an application, move/resize windows across monitors, volume/mute/lock/
+screenshot, keyboard shortcuts, browser tab control, folder opening).
+Multi-turn clarification ("Move Brave." -> "Which monitor?") and the
+confirmation gate for dangerous commands (shutdown/restart) both work
+end-to-end. Not yet done: the Spotify plugin, the macro engine, and a
+real settings UI - see `docs/commands.md` for the exact command list.
 
 ## Requirements
 
 - Windows 10/11 x64
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
+- A downloaded [Vosk model](https://alphacephei.com/vosk/models) under
+  `models/` (see `models/README.md`) for speech/wake features - everything
+  else works without one.
 
 ## Setup
 
@@ -32,7 +40,7 @@ uv sync
 
 ```powershell
 uv run atlas --diagnose      # check what's working
-uv run atlas --tray          # start the tray application
+uv run atlas --tray          # start the tray application (voice via "Enable voice")
 uv run atlas --help          # see all developer flags
 ```
 

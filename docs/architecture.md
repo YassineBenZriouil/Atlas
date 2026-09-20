@@ -51,17 +51,79 @@ through `RECOVERY`. See `atlas.application.state.StateMachine`. No
 uncaught exception is allowed to escape `Application.run_text_command` -
 it is the outer safety boundary (Atlas.md section 33).
 
-## Phase 1 vs. Phase 2 boundary
+## Phase 2 implementation status
 
-Interfaces that exist as abstract classes today (`WindowManager`,
-`ApplicationManager`, `MonitorManager`, `KeyboardController`,
-`MouseController`, `SystemController`, `Microphone`, `AudioStream`,
-`WakeDetector`) have no concrete Win32/audio-backed implementation yet.
-That is intentional - Phase 1's job is the skeleton, not the plumbing
-(Atlas.md section 79). What *is* fully implemented and tested in Phase 1:
-config, logging, the command pipeline for parameter-less commands, the
-plugin loader with isolation, the state machine, and the wake controller's
-state-transition logic (independent of real audio).
+Every Windows-layer interface now has a concrete, Win32-backed
+implementation, all verified against real windows/monitors/audio on a
+real machine (not just mocked):
+
+- `Win32WindowManager` / `Win32MonitorManager` / `Win32ApplicationManager`
+  (`atlas.windows`) - real window enumeration, focus (via
+  `AttachThreadInput`, working around Windows' foreground-lock
+  restriction), move/resize/minimize/maximize/close, monitor enumeration,
+  and application discovery (PATH, the registry's "App Paths" key,
+  configured executable paths).
+- `Win32KeyboardController` / `Win32MouseController` - real `keybd_event`/
+  `mouse_event` input.
+- `Win32SystemController` - real volume via `pycaw`, lock/sleep via
+  `ctypes`, shutdown/restart via a fixed `shutdown.exe` command line
+  (never voice-input-derived), screenshots via Qt's `QScreen.grabWindow`.
+- `SoundDeviceMicrophone` / `SoundDeviceAudioStream` (`atlas.audio`) -
+  real device enumeration and PCM capture via `sounddevice`.
+- `VoskSpeechEngine` / `VoskWakeDetector` (`atlas.speech`, `atlas.wake`) -
+  real offline recognition against a downloaded Vosk model; the wake
+  detector uses a grammar constrained to just the wake phrase.
+- `atlas.application.voice_loop.VoiceLoop` - the piece that actually
+  drives the pipeline continuously: microphone -> wake detector -> speech
+  engine -> `Application.run_text_command`, on a background thread.
+
+Still not implemented: the Spotify/browser-extension-free web search is
+done, but the Spotify plugin itself, and the macro engine (Atlas.md
+sections 27, 46), are future work.
+
+## Command grammar
+
+`atlas.commands.parser.CommandParser` now has three layers, tried in
+order:
+
+1. Exact phrases (`Grammar` / `add_grammar`) - the Phase 1 developer
+   commands.
+2. Templated patterns (`PatternGrammar` / `add_pattern`) - e.g.
+   `"open {application}"`, `"resize {application} to {width} by
+   {height}"`. Entities are extracted as raw strings; alias/path
+   resolution happens in the command's `execute()`, not at parse time, so
+   an unresolvable name is a normal execution failure
+   ("'photoshop' was not found"), not a parser guess.
+3. Custom matchers (`add_custom_matcher`) - currently just the one
+   multi-turn clarification flow the spec names explicitly (sections
+   28-29): a bare `"move brave"` with no monitor/direction returns a
+   `NeedsClarification("Which monitor?")` instead of guessing, and
+   `Application` remembers it as `_pending_clarification` until the next
+   utterance resolves or abandons it. The same mechanism
+   (`_pending_confirmation`) gates dangerous commands behind an explicit
+   "confirm".
+
+## Testability without disrupting the desktop
+
+Real Win32 calls that are read-only (monitor/window enumeration,
+locating an app by path) run in the normal `pytest` suite. Anything that
+pops a visible window, changes system volume, or drives real audio
+hardware is either:
+
+- exercised against fakes (`tests/fixtures/fakes.py` implements every
+  Windows-layer ABC in memory) for command-level and `Application`-level
+  logic, including the confirmation/clarification flows - a test can
+  prove "shutdown never runs without confirm" without ever touching
+  `Win32SystemController`, or
+- gated behind `ATLAS_TEST_DESKTOP=1` (`tests/integration/test_desktop_live.py`)
+  for the handful of tests that genuinely need to open/move a real window
+  or touch real volume, or
+- driven with **real** speech recognition against **locally synthesized**
+  audio: the TTS engine speaks a phrase to a WAV file, which is fed
+  through the real `VoskWakeDetector`/`VoskSpeechEngine`/`VoiceLoop` -
+  proving actual recognition works without a human speaker or any
+  network access (`tests/integration/test_speech_recognition.py`,
+  `test_voice_loop.py`; both skip cleanly if no model is downloaded).
 
 ## Plugins vs. integrations
 

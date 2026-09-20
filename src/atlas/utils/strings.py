@@ -28,8 +28,9 @@ _NUMBER_WORDS: dict[str, str] = {
     "ninety": "90",
     "hundred": "100",
     "too": "2",
-    "to": "2",
 }
+
+_FILLER_WORDS = frozenset({"to", "the"})
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _PUNCTUATION_RE = re.compile(r"[^\w\s]")
@@ -46,9 +47,11 @@ def strip_punctuation(text: str) -> str:
 def words_to_numbers(text: str, *, only_after: tuple[str, ...] = ()) -> str:
     """Replace number words with digits.
 
-    If `only_after` is given, a word is only converted when it immediately
-    follows one of those tokens (avoids mangling homophones like "to" outside
-    of a numeric context, e.g. "monitor two" but not "go to brave").
+    If `only_after` is given, a word is only converted when the nearest
+    preceding non-filler token is one of those words - e.g. "monitor two"
+    converts, and so does "volume to thirty" (skipping the filler "to" to
+    find "volume"), but "go to brave" is untouched since "brave" isn't a
+    number word in the first place and "go" is never a trigger.
     """
     tokens = text.split()
     out: list[str] = []
@@ -57,9 +60,13 @@ def words_to_numbers(text: str, *, only_after: tuple[str, ...] = ()) -> str:
         if replacement is None:
             out.append(token)
             continue
-        if only_after and (i == 0 or tokens[i - 1] not in only_after):
-            out.append(token)
-            continue
+        if only_after:
+            j = i - 1
+            while j >= 0 and tokens[j] in _FILLER_WORDS:
+                j -= 1
+            if j < 0 or tokens[j] not in only_after:
+                out.append(token)
+                continue
         out.append(replacement)
     return " ".join(out)
 

@@ -19,3 +19,11 @@ def test_normalize_does_not_convert_unrelated_to():
 
 def test_normalize_lowercases():
     assert normalize("OPEN BRAVE") == "open brave"
+
+
+def test_normalize_volume_with_filler_word():
+    assert normalize("set volume to thirty") == "set volume to 30"
+
+
+def test_normalize_move_to_monitor_unaffected_by_filler_fix():
+    assert normalize("move brave to monitor two") == "move brave to monitor 2"

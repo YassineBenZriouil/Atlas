@@ -21,6 +21,20 @@ tests/fixtures/     # sample plugins etc. used by integration tests
 `tests/conftest.py` redirects `%APPDATA%` to a pytest `tmp_path` for every
 test automatically - tests never touch your real ATLAS configuration.
 
+Tests that would open/move a real window or touch system volume are
+skipped by default and gated behind an env var:
+
+```powershell
+uv run pytest                              # skips tests/integration/test_desktop_live.py
+$env:ATLAS_TEST_DESKTOP = "1"; uv run pytest tests/integration/test_desktop_live.py
+```
+
+Speech/wake tests (`test_speech_recognition.py`, `test_voice_loop.py`)
+skip cleanly if no Vosk model is present under `models/` - download one
+per `models/README.md` to run them; they synthesize their own test audio
+via the local TTS engine, so no human speaker or network access is needed
+once the model is downloaded.
+
 ## Running things
 
 ```powershell

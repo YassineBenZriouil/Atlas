@@ -28,3 +28,6 @@ class Recognizer:
 
     def process_audio(self, audio: bytes) -> RecognitionResult | None:
         return self._engine.process_audio(audio)
+
+    def finalize(self) -> RecognitionResult | None:
+        return self._engine.finalize()
