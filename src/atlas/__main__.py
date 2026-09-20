@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reload", action="store_true")
     parser.add_argument("--tray", action="store_true", help="Start the tray application")
     parser.add_argument(
+        "--console",
+        action="store_true",
+        help="Type commands as text instead of speaking them (for testing without voice)",
+    )
+    parser.add_argument(
         "--spotify-login", action="store_true", help="Run the Spotify OAuth sign-in flow"
     )
     parser.add_argument(
@@ -145,6 +150,29 @@ def _spotify_logout() -> int:
 
     clear_refresh_token()
     print("Spotify credentials cleared.")
+    return 0
+
+
+def _run_console(app: Application) -> int:
+    """Feeds typed text straight to Application.run_text_command - the
+    same entry point speech recognition uses once it has transcribed
+    something. Bypasses the microphone/wake/speech-engine entirely, so
+    it's the fastest way to tell "the command doesn't work" apart from
+    "ATLAS never heard the command in the first place"."""
+    print("ATLAS text console - type a command, or 'exit' to quit.")
+    print("Example: open brave")
+    while True:
+        try:
+            text = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not text:
+            continue
+        if text.lower() in ("exit", "quit"):
+            break
+        result = app.run_text_command(text)
+        print(f"[{'OK' if result.success else 'FAIL'}] {result.message}")
     return 0
 
 
@@ -277,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
     app = Application()
     app.bootstrap()
 
+    if args.console:
+        return _run_console(app)
     if args.tray:
         return _run_tray(app)
 

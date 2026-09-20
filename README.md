@@ -41,6 +41,7 @@ uv sync
 
 ```powershell
 uv run atlas --diagnose      # check what's working
+uv run atlas --console       # type commands as text (no mic/wake word needed - good for testing)
 uv run atlas --tray          # start the tray application (voice via "Enable voice")
 uv run atlas --spotify-login # optional: connect a Spotify account (see docs/plugins.md)
 uv run atlas --help          # see all developer flags
