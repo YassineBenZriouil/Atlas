@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from atlas.ui.icon import build_icon
 from atlas.ui.status import status_text
 
 
@@ -26,7 +27,7 @@ class TrayApplication:
         on_exit: Callable[[], None] | None = None,
     ) -> None:
         self._qt_app = QApplication.instance() or QApplication([])
-        self._tray = QSystemTrayIcon(QIcon())
+        self._tray = QSystemTrayIcon(build_icon("SLEEPING"))
         self._menu = QMenu()
         self._actions: list[QAction] = []
 
@@ -58,6 +59,7 @@ class TrayApplication:
 
     def set_status(self, state_name: str) -> None:
         self._status_action.setText(status_text(state_name))
+        self._tray.setIcon(build_icon(state_name))
 
     def show(self) -> None:
         self._tray.show()
