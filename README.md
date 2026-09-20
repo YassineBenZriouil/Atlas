@@ -15,11 +15,12 @@ real microphone capture, real offline speech recognition and wake-word
 detection (Vosk), real Win32 window/monitor/keyboard/mouse/volume control,
 and a real command set (open/close/focus/switch/minimize/maximize/restore
 an application, move/resize windows across monitors, volume/mute/lock/
-screenshot, keyboard shortcuts, browser tab control, folder opening).
-Multi-turn clarification ("Move Brave." -> "Which monitor?") and the
-confirmation gate for dangerous commands (shutdown/restart) both work
-end-to-end. Not yet done: the Spotify plugin, the macro engine, and a
-real settings UI - see `docs/commands.md` for the exact command list.
+screenshot, keyboard shortcuts, browser tab control, folder opening,
+optional Spotify playback). Multi-turn clarification ("Move Brave." ->
+"Which monitor?") and the confirmation gate for dangerous commands
+(shutdown/restart) both work end-to-end. Not yet done: the macro engine
+and a real settings UI - see `docs/commands.md` for the exact command
+list.
 
 ## Requirements
 
@@ -41,6 +42,7 @@ uv sync
 ```powershell
 uv run atlas --diagnose      # check what's working
 uv run atlas --tray          # start the tray application (voice via "Enable voice")
+uv run atlas --spotify-login # optional: connect a Spotify account (see docs/plugins.md)
 uv run atlas --help          # see all developer flags
 ```
 

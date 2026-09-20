@@ -26,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--list-plugins", action="store_true")
     parser.add_argument("--reload", action="store_true")
     parser.add_argument("--tray", action="store_true", help="Start the tray application")
+    parser.add_argument(
+        "--spotify-login", action="store_true", help="Run the Spotify OAuth sign-in flow"
+    )
+    parser.add_argument(
+        "--spotify-logout", action="store_true", help="Forget stored Spotify credentials"
+    )
     return parser
 
 
@@ -103,6 +109,42 @@ def _test_speech() -> int:
         print(f"Failed to start speech engine: {exc}")
         return 1
     print(f"Speech engine loaded model at {model_path}.")
+    return 0
+
+
+def _spotify_login() -> int:
+    import os
+
+    from dotenv import load_dotenv
+
+    from atlas.integrations.spotify.auth import SpotifyAuthError, SpotifyCredentials, run_login_flow
+
+    load_dotenv()
+    client_id = os.environ.get("ATLAS_SPOTIFY_CLIENT_ID", "")
+    client_secret = os.environ.get("ATLAS_SPOTIFY_CLIENT_SECRET", "")
+    redirect_uri = os.environ.get("ATLAS_SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback")
+    if not client_id or not client_secret:
+        print(
+            "ATLAS_SPOTIFY_CLIENT_ID/ATLAS_SPOTIFY_CLIENT_SECRET are not set. "
+            "Copy .env.example to .env, fill in your Spotify app's credentials "
+            "(register one at https://developer.spotify.com), and try again."
+        )
+        return 1
+
+    try:
+        run_login_flow(SpotifyCredentials(client_id, client_secret, redirect_uri))
+    except SpotifyAuthError as exc:
+        print(f"Spotify sign-in failed: {exc}")
+        return 1
+    print("Spotify connected.")
+    return 0
+
+
+def _spotify_logout() -> int:
+    from atlas.integrations.spotify.token_store import clear_refresh_token
+
+    clear_refresh_token()
+    print("Spotify credentials cleared.")
     return 0
 
 
@@ -221,6 +263,10 @@ def main(argv: list[str] | None = None) -> int:
         return _list_monitors()
     if args.list_windows:
         return _list_windows()
+    if args.spotify_login:
+        return _spotify_login()
+    if args.spotify_logout:
+        return _spotify_logout()
     if args.reload:
         print(
             "Live reload requires signalling an already-running ATLAS process; "

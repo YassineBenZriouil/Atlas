@@ -14,9 +14,12 @@ from atlas.commands.registry import CommandRegistry
 from atlas.config.loader import load_config
 from atlas.config.schema import AtlasConfig
 from atlas.integrations.browser import commands as browser_commands
+from atlas.integrations.spotify import SpotifyPlugin
+from atlas.integrations.spotify import commands as spotify_commands
+from atlas.integrations.spotify.client import SpotifyClient
 from atlas.logging_setup import configure_logging, get_logger
 from atlas.plugins.loader import PluginLoader
-from atlas.plugins.registry import PluginRegistry
+from atlas.plugins.registry import PluginRegistry, PluginStatus
 from atlas.utils.paths import get_config_path, get_log_dir, get_plugins_dir
 from atlas.utils.strings import normalize
 from atlas.windows.applications import ApplicationManager, Win32ApplicationManager
@@ -68,6 +71,7 @@ class Application:
         self.system_controller: SystemController = system_controller or Win32SystemController()
         self._injected_application_manager = application_manager
         self.application_manager: ApplicationManager | None = application_manager
+        self.spotify_client: SpotifyClient | None = None
 
         self._pending_clarification: NeedsClarification | None = None
         self._pending_confirmation: tuple[Command, CommandContext] | None = None
@@ -90,7 +94,6 @@ class Application:
         application_commands.register(self.command_registry)
         window_commands.register(self.command_registry)
         system_commands.register(self.command_registry)
-        browser_commands.register(self.command_registry)
         keyboard_commands.register(self.command_registry)
 
         self.parser = CommandParser(self.command_registry)
@@ -98,14 +101,27 @@ class Application:
         application_commands.register_grammars(self.parser)
         window_commands.register_grammars(self.parser)
         system_commands.register_grammars(self.parser)
-        browser_commands.register_grammars(self.parser)
         keyboard_commands.register_grammars(self.parser)
+
+        self.plugin_loader = PluginLoader(self.command_registry, self.plugin_registry)
+
+        # Spotify's grammars ("search spotify for X", "play X") must be
+        # registered before browser's generic "search {query}"/catch-alls,
+        # or the more specific Spotify phrasing would never be reached.
+        self.plugin_loader.load_plugin_class(SpotifyPlugin)
+        spotify_record = self.plugin_registry.get("spotify")
+        if spotify_record is not None and spotify_record.status is PluginStatus.LOADED:
+            assert isinstance(spotify_record.instance, SpotifyPlugin)
+            self.spotify_client = spotify_record.instance.client
+            spotify_commands.register_grammars(self.parser)
+
+        browser_commands.register(self.command_registry)
+        browser_commands.register_grammars(self.parser)
 
         self.dispatcher = CommandDispatcher(
             confirmations_enabled=self.config.commands.require_confirmation
         )
 
-        self.plugin_loader = PluginLoader(self.command_registry, self.plugin_registry)
         self.plugin_loader.discover_and_load(get_plugins_dir())
 
         self.state_machine.on_change(
@@ -128,6 +144,7 @@ class Application:
                 "keyboard_controller": self.keyboard_controller,
                 "mouse_controller": self.mouse_controller,
                 "system_controller": self.system_controller,
+                "spotify_client": self.spotify_client,
             },
         )
 

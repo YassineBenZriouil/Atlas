@@ -71,8 +71,15 @@ end-to-end without touching Windows:
 | Keyboard | press `<key>` [`<key>` ...] | `atlas.commands.keyboard_commands` |
 | Browser | new/close/next/previous tab, refresh, back/forward, focus address bar, search, web search | `atlas.integrations.browser.commands` |
 | Filesystem | open `<known or configured folder>` - folded into the "open" application command (see below) | `atlas.integrations.filesystem.folders` |
+| Spotify (optional) | play/pause/resume, next/previous song, search spotify for `<query>`, play `<song or artist>`, play playlist `<name>` | `atlas.integrations.spotify.commands` |
 
 \* requires confirmation - see below.
+
+Spotify's commands only exist in the parser at all if the plugin actually
+loaded (credentials configured + `atlas --spotify-login` run) - see
+`docs/plugins.md`. "volume up"/"volume down" are intentionally *not*
+duplicated for Spotify; they're already bound to system volume, which
+controls Spotify's audio anyway.
 
 "open X" deliberately has exactly **one** grammar covering both
 applications and folders (Atlas.md sections 18 and 23 both use the verb

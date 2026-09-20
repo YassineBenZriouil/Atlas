@@ -16,6 +16,8 @@ dependencies = [
     "pyttsx3>=2.90",
     "tomli-w>=1.0",
     "pycaw>=20240210; sys_platform == 'win32'",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
 ]
 
 [project.scripts]

@@ -46,6 +46,13 @@ redacts common secret-shaped substrings (`password=`, `client_secret=`,
 defense-in-depth measure - it is not a substitute for not logging secrets
 in the first place.
 
+Spotify's refresh token specifically is stored in **Windows Credential
+Manager**, not config or `.env` (`atlas.integrations.spotify.token_store`,
+using `win32cred` - no extra dependency). Access tokens are never
+persisted at all: they're re-derived from the refresh token on demand and
+kept only in memory (`SpotifyClient`), since they're short-lived and
+cheap to refresh. `atlas --spotify-logout` deletes the stored credential.
+
 ## Reporting a vulnerability
 
 This is a pre-release local project; open an issue against the repository

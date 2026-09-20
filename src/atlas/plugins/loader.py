@@ -41,6 +41,12 @@ class PluginLoader:
         for module_path in self.discover(plugins_dir):
             self._load_one(module_path)
 
+    def load_plugin_class(self, plugin_cls: type[AtlasPlugin], *, name: str | None = None) -> None:
+        """For first-party plugins bundled in the installed package (e.g.
+        Spotify) rather than discovered from a directory on disk - same
+        isolation guarantee, just skipping the filesystem import step."""
+        self._activate(plugin_cls, name or getattr(plugin_cls, "name", "") or "plugin")
+
     def _load_one(self, module_path: Path) -> None:
         name = module_path.parent.name if module_path.name == "__init__.py" else module_path.stem
         try:
@@ -57,7 +63,13 @@ class PluginLoader:
                 raise TypeError(
                     f"`{_ENTRY_ATTRIBUTE}` in {module_path} is not an AtlasPlugin subclass"
                 )
+            self._activate(plugin_cls, name)
+        except Exception as exc:  # noqa: BLE001 - plugin isolation boundary
+            logger.error("Plugin disabled: %s (reason: %s)", name, exc)
+            self._plugin_registry.mark_disabled(name, str(exc))
 
+    def _activate(self, plugin_cls: type[AtlasPlugin], fallback_name: str) -> None:
+        try:
             plugin: AtlasPlugin = plugin_cls()
             if not plugin.name:
                 raise ValueError("Plugin must define a non-empty `name`")
@@ -68,8 +80,8 @@ class PluginLoader:
             self._plugin_registry.mark_loaded(plugin)
             logger.info("Plugin loaded: %s", plugin.name)
         except Exception as exc:  # noqa: BLE001 - plugin isolation boundary
-            logger.error("Plugin disabled: %s (reason: %s)", name, exc)
-            self._plugin_registry.mark_disabled(name, str(exc))
+            logger.error("Plugin disabled: %s (reason: %s)", fallback_name, exc)
+            self._plugin_registry.mark_disabled(fallback_name, str(exc))
 
     def shutdown_all(self) -> None:
         for plugin in self._plugin_registry.loaded_plugins():

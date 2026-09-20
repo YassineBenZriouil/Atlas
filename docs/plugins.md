@@ -48,7 +48,39 @@ test.
 ## First-party integrations
 
 `src/atlas/integrations/{spotify,browser,filesystem}` are first-party
-plugins shipped with ATLAS itself, loaded the same way. They are optional
-and core code never imports them directly (Atlas.md section 58) - this is
-what lets Spotify's absence, or an auth failure, degrade to "plugin
-disabled" instead of an ATLAS-wide failure.
+plugins shipped with ATLAS itself. Browser and filesystem are wired
+directly into `Application.bootstrap()` (they're core-ish per Atlas.md's
+own command categories, sections 21/23/26). Spotify is different: it's
+genuinely optional and load-bearing on external state (a Spotify account,
+OAuth), so it goes through the *real* isolation path -
+`PluginLoader.load_plugin_class(SpotifyPlugin)` - the same
+initialize/register_commands/mark_loaded-or-disabled sequence a
+third-party plugin in `plugins/` gets, just skipping the filesystem
+import step since it's already part of the installed package.
+
+## Spotify plugin (a worked example of "optional")
+
+Setup (see `docs/configuration.md` and `.env.example`):
+
+1. Register an app at https://developer.spotify.com to get a client
+   ID/secret.
+2. Copy `.env.example` to `.env`, fill in
+   `ATLAS_SPOTIFY_CLIENT_ID`/`ATLAS_SPOTIFY_CLIENT_SECRET`.
+3. Run `atlas --spotify-login` once - it opens a browser for Spotify's own
+   sign-in/consent screen, catches the redirect on a local
+   `http://127.0.0.1:8888/callback` server, and stores only the resulting
+   **refresh token** in Windows Credential Manager
+   (`atlas.integrations.spotify.token_store`) - never in config, never in
+   logs.
+4. `atlas --spotify-logout` forgets it again.
+
+`SpotifyPlugin.initialize()` checks for both the env vars and a stored
+refresh token; missing either raises, which `PluginLoader` turns into a
+clean `DISABLED` record with the reason ("...see .env.example" or "...run
+`atlas --spotify-login`") rather than blocking ATLAS startup - the same
+mechanism `tests/integration/test_spotify_plugin.py` exercises for real,
+with no Spotify account needed to prove it works.
+
+Runtime API calls (`atlas.integrations.spotify.client.SpotifyClient`) go
+only to Spotify's official Web API over HTTPS - no scraping, no audio
+download, no bypassing Spotify's own auth (Atlas.md section 27).
