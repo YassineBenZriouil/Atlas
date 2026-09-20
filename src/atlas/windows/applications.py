@@ -4,6 +4,7 @@ in atlas.config) to executables."""
 
 from __future__ import annotations
 
+import difflib
 import shutil
 import winreg
 from abc import ABC, abstractmethod
@@ -13,6 +14,8 @@ from pathlib import Path
 from atlas.config.schema import AtlasConfig
 from atlas.utils.process import launch_executable
 from atlas.windows.windows import WindowHandle, WindowManager
+
+_FUZZY_ALIAS_CUTOFF = 0.75
 
 
 @dataclass(frozen=True)
@@ -48,8 +51,11 @@ class ApplicationNotFoundError(RuntimeError):
 class Win32ApplicationManager(ApplicationManager):
     """Resolution order for `locate`: configured executable path -> PATH
     lookup -> the Windows "App Paths" registry. Never falls back to
-    guessing/fuzzy-matching a path - an unresolved application is reported
-    as not found (Atlas.md section 56), not silently substituted."""
+    guessing/fuzzy-matching a *path* - an unresolved application is
+    reported as not found (Atlas.md section 56), not silently
+    substituted. `resolve_alias` does allow one deterministic fuzzy step
+    (see `_resolve_alias_fuzzy`), but only across already-configured
+    alias text - never onto an arbitrary path."""
 
     def __init__(self, config: AtlasConfig, window_manager: WindowManager) -> None:
         self._config = config
@@ -60,7 +66,30 @@ class Win32ApplicationManager(ApplicationManager):
         for key, entry in self._config.applications.items():
             if alias_lower == key.lower() or alias_lower in (a.lower() for a in entry.aliases):
                 return ApplicationInfo(alias=key, executable_path=entry.executable or None)
-        return None
+        return self._resolve_alias_fuzzy(alias_lower)
+
+    def _resolve_alias_fuzzy(self, alias_lower: str) -> ApplicationInfo | None:
+        """Deterministic fallback for ASR misrecognitions of an otherwise
+        correctly *configured* alias (Atlas.md section 63: fuzzy matching
+        is permitted for application names, but must never bypass safety
+        validation - this only ever resolves to an alias already present
+        in config, never invents a path, and command verbs/dangerous
+        command names are matched by exact grammar elsewhere and are
+        never reachable through this method at all)."""
+        candidates: dict[str, str] = {}
+        for key, entry in self._config.applications.items():
+            candidates[key.lower()] = key
+            for a in entry.aliases:
+                candidates[a.lower()] = key
+
+        match = difflib.get_close_matches(
+            alias_lower, candidates.keys(), n=1, cutoff=_FUZZY_ALIAS_CUTOFF
+        )
+        if not match:
+            return None
+        key = candidates[match[0]]
+        entry = self._config.applications[key]
+        return ApplicationInfo(alias=key, executable_path=entry.executable or None)
 
     def locate(self, alias: str) -> str | None:
         info = self.resolve_alias(alias)

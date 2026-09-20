@@ -29,6 +29,16 @@ def _managers(context: CommandContext) -> tuple[ApplicationManager, WindowManage
     return context.extra["application_manager"], context.extra["window_manager"]
 
 
+def _display_name(app_manager: ApplicationManager, application: str) -> str:
+    """The fuzzy alias fallback (Atlas.md section 63) means what the user
+    said and what ATLAS actually resolved can differ (e.g. a misheard
+    "vs cold" resolving to "vscode") - success messages should echo the
+    resolved name, not the raw possibly-misheard text, so the response
+    doesn't read as if it repeated the mistake back."""
+    info = app_manager.resolve_alias(application)
+    return info.alias if info is not None else application
+
+
 def _require_window(context: CommandContext, application: str) -> WindowHandle | CommandResult:
     app_manager, _ = _managers(context)
     windows = app_manager.windows_for(application)
@@ -58,7 +68,8 @@ class OpenApplicationCommand(Command):
         app_manager, _ = _managers(context)
         try:
             app_manager.launch(self.application)
-            return CommandResult.ok(f"Opening {self.application}", application=self.application)
+            name = _display_name(app_manager, self.application)
+            return CommandResult.ok(f"Opening {name}", application=name)
         except ApplicationNotFoundError:
             pass
 
@@ -89,7 +100,7 @@ class CloseApplicationCommand(Command):
         if not app_manager.is_running(self.application):
             return CommandResult.fail(f"{self.application} is not running")
         app_manager.terminate(self.application)
-        return CommandResult.ok(f"Closing {self.application}")
+        return CommandResult.ok(f"Closing {_display_name(app_manager, self.application)}")
 
     def describe(self) -> str:
         return f"Close {self.application}"
@@ -113,9 +124,9 @@ class FocusApplicationCommand(Command):
         window = _require_window(context, self.application)
         if isinstance(window, CommandResult):
             return window
-        _, window_manager = _managers(context)
+        app_manager, window_manager = _managers(context)
         window_manager.focus_window(window)
-        return CommandResult.ok(f"Switched to {self.application}")
+        return CommandResult.ok(f"Switched to {_display_name(app_manager, self.application)}")
 
     def describe(self) -> str:
         return f"Switch to {self.application}"
@@ -136,9 +147,9 @@ class MinimizeApplicationCommand(Command):
         window = _require_window(context, self.application)
         if isinstance(window, CommandResult):
             return window
-        _, window_manager = _managers(context)
+        app_manager, window_manager = _managers(context)
         window_manager.minimize_window(window)
-        return CommandResult.ok(f"Minimized {self.application}")
+        return CommandResult.ok(f"Minimized {_display_name(app_manager, self.application)}")
 
     def describe(self) -> str:
         return f"Minimize {self.application}"
@@ -159,9 +170,9 @@ class MaximizeApplicationCommand(Command):
         window = _require_window(context, self.application)
         if isinstance(window, CommandResult):
             return window
-        _, window_manager = _managers(context)
+        app_manager, window_manager = _managers(context)
         window_manager.maximize_window(window)
-        return CommandResult.ok(f"Maximized {self.application}")
+        return CommandResult.ok(f"Maximized {_display_name(app_manager, self.application)}")
 
     def describe(self) -> str:
         return f"Maximize {self.application}"
@@ -182,9 +193,9 @@ class RestoreApplicationCommand(Command):
         window = _require_window(context, self.application)
         if isinstance(window, CommandResult):
             return window
-        _, window_manager = _managers(context)
+        app_manager, window_manager = _managers(context)
         window_manager.restore_window(window)
-        return CommandResult.ok(f"Restored {self.application}")
+        return CommandResult.ok(f"Restored {_display_name(app_manager, self.application)}")
 
     def describe(self) -> str:
         return f"Restore {self.application}"
