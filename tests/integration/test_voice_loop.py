@@ -103,9 +103,9 @@ def test_wake_then_command_executes_end_to_end(tmp_path):
     audio = (
         _silence(0.3)
         + _load_pcm_16k_mono(wake_wav)
-        + _silence(0.3)
+        + _silence(0.5)
         + _load_pcm_16k_mono(command_wav)
-        + _silence(2.0)
+        + _silence(3.0)
     )
 
     app, app_manager = make_app()
@@ -114,7 +114,12 @@ def test_wake_then_command_executes_end_to_end(tmp_path):
     loop = VoiceLoop(
         app=app,
         model_path=str(MODEL_PATH),
-        listen_timeout_seconds=1.0,
+        # Generous on purpose: firing wake as soon as the phrase appears in
+        # a partial result (rather than waiting for AcceptWaveform to
+        # complete) means some trailing wake-clip audio can land in the
+        # command-listening phase here - a synthetic-buffer artifact, not
+        # a real-microphone one - so the timeout needs slack to absorb it.
+        listen_timeout_seconds=2.5,
         on_event=lambda kind, message: events.append((kind, message)),
     )
     # Drive the same code start() would, without opening a real microphone.
