@@ -47,6 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--list-monitors", action="store_true")
     parser.add_argument("--list-windows", action="store_true")
     parser.add_argument("--list-plugins", action="store_true")
+    parser.add_argument(
+        "--discover-apps",
+        action="store_true",
+        help="Scan installed applications (Start Menu + Store apps) and add them to config",
+    )
     parser.add_argument("--reload", action="store_true")
     parser.add_argument("--tray", action="store_true", help="Start the tray application")
     parser.add_argument(
@@ -142,6 +147,38 @@ def _test_speech() -> int:
         print(f"Failed to start speech engine: {exc}")
         return 1
     print(f"Speech engine loaded model at {model_path}.")
+    return 0
+
+
+def _discover_apps() -> int:
+    from atlas.config.loader import save_config
+    from atlas.utils.paths import get_config_path
+    from atlas.windows.discovery import discover_installed_applications, merge_discovered_apps
+
+    app = Application()
+    app.bootstrap()
+    assert app.config is not None
+
+    print("Scanning Start Menu shortcuts and Store apps...")
+    discovered = discover_installed_applications()
+    result = merge_discovered_apps(app.config, discovered)
+
+    if result.updated:
+        print(f"\nFilled in a launch path for {len(result.updated)} already-configured app(s):")
+        for name in sorted(result.updated):
+            print(f"  {name}")
+
+    if result.added:
+        print(f"\nAdded {len(result.added)} new app(s):")
+        for name in sorted(result.added):
+            print(f"  {name}")
+
+    if not result.updated and not result.added:
+        print("\nNothing new to add - config is already up to date.")
+        return 0
+
+    save_config(get_config_path(), app.config)
+    print(f"\nSaved to {get_config_path()}")
     return 0
 
 
@@ -326,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
         return _list_monitors()
     if args.list_windows:
         return _list_windows()
+    if args.discover_apps:
+        return _discover_apps()
     if args.spotify_login:
         return _spotify_login()
     if args.spotify_logout:

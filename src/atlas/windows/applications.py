@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import difflib
 import shutil
+import subprocess
 import winreg
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -13,9 +14,12 @@ from pathlib import Path
 
 from atlas.config.schema import AtlasConfig
 from atlas.utils.process import launch_executable
+from atlas.windows.discovery import UWP_TARGET_PREFIX
 from atlas.windows.windows import WindowHandle, WindowManager
 
 _FUZZY_ALIAS_CUTOFF = 0.75
+_MIN_PREFIX_LENGTH = 3
+_MIN_RATIO_LENGTH = 5
 
 
 @dataclass(frozen=True)
@@ -82,12 +86,47 @@ class Win32ApplicationManager(ApplicationManager):
             for a in entry.aliases:
                 candidates[a.lower()] = key
 
+        # Ratio-based matching against a *short* candidate alias (e.g.
+        # "set") is unreliable - a couple of shared characters between two
+        # short strings produces a deceptively high ratio ("se" vs "set"
+        # is 0.8). Short aliases are handled by the stricter prefix
+        # mechanism below instead, which has its own ambiguity guard.
+        ratio_candidates = {
+            text: key for text, key in candidates.items() if len(text) >= _MIN_RATIO_LENGTH
+        }
         match = difflib.get_close_matches(
-            alias_lower, candidates.keys(), n=1, cutoff=_FUZZY_ALIAS_CUTOFF
+            alias_lower, ratio_candidates.keys(), n=1, cutoff=_FUZZY_ALIAS_CUTOFF
         )
-        if not match:
+        if match:
+            key = ratio_candidates[match[0]]
+            entry = self._config.applications[key]
+            return ApplicationInfo(alias=key, executable_path=entry.executable or None)
+
+        return self._resolve_alias_prefix(alias_lower, candidates)
+
+    def _resolve_alias_prefix(
+        self, alias_lower: str, candidates: dict[str, str]
+    ) -> ApplicationInfo | None:
+        """Short abbreviations ("spot" for "spotify", "disc" for
+        "discord", "set" for "settings") often fall below the ratio-based
+        cutoff above purely because they're short, even though they're an
+        unambiguous truncation. A prefix match either way is still exact,
+        deterministic text matching - not a guess - but if the short form
+        could mean two different configured apps, ATLAS must not pick one
+        (Atlas.md section 28: never guess)."""
+        if len(alias_lower) < _MIN_PREFIX_LENGTH:
             return None
-        key = candidates[match[0]]
+
+        matched_keys = {
+            key
+            for candidate_text, key in candidates.items()
+            if len(candidate_text) >= _MIN_PREFIX_LENGTH
+            and (candidate_text.startswith(alias_lower) or alias_lower.startswith(candidate_text))
+        }
+        if len(matched_keys) != 1:
+            return None
+
+        key = next(iter(matched_keys))
         entry = self._config.applications[key]
         return ApplicationInfo(alias=key, executable_path=entry.executable or None)
 
@@ -95,6 +134,8 @@ class Win32ApplicationManager(ApplicationManager):
         info = self.resolve_alias(alias)
         candidates = [alias]
         if info is not None:
+            if info.executable_path and info.executable_path.startswith(UWP_TARGET_PREFIX):
+                return info.executable_path
             if info.executable_path and Path(info.executable_path).exists():
                 return info.executable_path
             entry = self._config.applications.get(info.alias)
@@ -132,6 +173,12 @@ class Win32ApplicationManager(ApplicationManager):
         path = self.locate(alias)
         if path is None:
             raise ApplicationNotFoundError(f"'{alias}' was not found")
+        if path.startswith(UWP_TARGET_PREFIX):
+            app_id = path[len(UWP_TARGET_PREFIX) :]
+            # Store apps have no real .exe to launch directly; this is the
+            # standard way to start one from outside the Start Menu itself.
+            subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{app_id}"], shell=False)
+            return
         launch_executable(path)
 
     def _process_names_for(self, alias: str) -> set[str]:
@@ -139,10 +186,10 @@ class Win32ApplicationManager(ApplicationManager):
         info = self.resolve_alias(alias)
         if info is not None:
             names.add(info.alias.lower())
-            if info.executable_path:
+            if info.executable_path and not info.executable_path.startswith(UWP_TARGET_PREFIX):
                 names.add(Path(info.executable_path).name.lower())
         path = self.locate(alias)
-        if path:
+        if path and not path.startswith(UWP_TARGET_PREFIX):
             names.add(Path(path).name.lower())
         return names
 
