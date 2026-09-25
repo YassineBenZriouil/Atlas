@@ -7,8 +7,9 @@ from tests.fixtures.fakes import (
     FakeWindowManager,
 )
 
-from atlas.__main__ import _run_console, build_parser, main
+from atlas.__main__ import _print_diagnostics, _run_console, build_parser, main
 from atlas.application.app import Application
+from atlas.diagnostics import CheckResult, CheckStatus
 
 
 def make_fake_app() -> Application:
@@ -55,6 +56,7 @@ def test_parser_accepts_all_documented_flags():
             "--list-plugins",
             "--reload",
             "--tray",
+            "--start",
             "--console",
             "--spotify-login",
             "--spotify-logout",
@@ -62,7 +64,39 @@ def test_parser_accepts_all_documented_flags():
     )
     assert args.test_microphone
     assert args.tray
+    assert args.start
     assert args.console
+
+
+def test_print_diagnostics_plain_when_not_a_tty(monkeypatch, capsys):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    results = [
+        CheckResult("Thing A", CheckStatus.PASS),
+        CheckResult("Thing B", CheckStatus.FAIL, "broken"),
+    ]
+
+    _print_diagnostics(results)
+
+    out = capsys.readouterr().out
+    assert "\033[" not in out
+    assert "[PASS] Thing A" in out
+    assert "[FAIL] Thing B - broken" in out
+
+
+def test_print_diagnostics_colored_when_a_tty(monkeypatch, capsys):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    results = [
+        CheckResult("Thing A", CheckStatus.PASS),
+        CheckResult("Thing B", CheckStatus.WARN, "meh"),
+        CheckResult("Thing C", CheckStatus.FAIL, "broken"),
+    ]
+
+    _print_diagnostics(results)
+
+    out = capsys.readouterr().out
+    assert "\033[92m[PASS]\033[0m Thing A" in out
+    assert "\033[93m[WARN]\033[0m Thing B - meh" in out
+    assert "\033[91m[FAIL]\033[0m Thing C - broken" in out
 
 
 def test_console_mode_runs_commands_against_fakes(monkeypatch, capsys):

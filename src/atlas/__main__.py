@@ -8,10 +8,33 @@ import time
 
 from atlas import __version__
 from atlas.application.app import Application
-from atlas.diagnostics import format_results, run_diagnostics
+from atlas.diagnostics import CheckResult, format_results, run_diagnostics
 from atlas.logging_setup import get_logger
 
 logger = get_logger("cli")
+
+_ANSI_COLOR_BY_STATUS = {
+    "PASS": "\033[92m",  # green
+    "WARN": "\033[93m",  # yellow
+    "FAIL": "\033[91m",  # red
+}
+_ANSI_RESET = "\033[0m"
+
+
+def _print_diagnostics(results: list[CheckResult]) -> None:
+    """Colored PASS/WARN/FAIL when writing to a real terminal; plain text
+    (no escape codes) when piped/redirected, so logs/output files stay
+    clean."""
+    if not sys.stdout.isatty():
+        print(format_results(results))
+        return
+
+    for result in results:
+        color = _ANSI_COLOR_BY_STATUS.get(result.status.name, "")
+        line = f"{color}[{result.status.name}]{_ANSI_RESET} {result.name}"
+        if result.detail:
+            line += f" - {result.detail}"
+        print(line)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -26,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--list-plugins", action="store_true")
     parser.add_argument("--reload", action="store_true")
     parser.add_argument("--tray", action="store_true", help="Start the tray application")
+    parser.add_argument(
+        "--start",
+        action="store_true",
+        help="Run diagnostics (colored PASS/WARN/FAIL), then start the tray application",
+    )
     parser.add_argument(
         "--console",
         action="store_true",
@@ -268,8 +296,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.diagnose:
-        print(format_results(run_diagnostics()))
+        _print_diagnostics(run_diagnostics())
         return 0
+
+    if args.start:
+        _print_diagnostics(run_diagnostics())
+        print()
+        app = Application()
+        app.bootstrap()
+        return _run_tray(app)
 
     if args.list_plugins:
         app = Application()
