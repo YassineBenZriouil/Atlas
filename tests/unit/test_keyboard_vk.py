@@ -1,6 +1,7 @@
 import pytest
 
-from atlas.windows.keyboard import key_to_vk, normalize_key
+from atlas.platform.keyboard import normalize_key
+from atlas.platform.win32.keyboard import key_to_vk
 
 
 def test_normalize_alias():

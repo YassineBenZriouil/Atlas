@@ -7,15 +7,14 @@ import time
 import pytest
 
 from atlas.config.defaults import default_config
-from atlas.windows.applications import Win32ApplicationManager
-from atlas.windows.keyboard import Win32KeyboardController
-from atlas.windows.system import Win32SystemController
-from atlas.windows.windows import Win32WindowManager
+from atlas.platform.win32.applications import Win32ApplicationManager
+from atlas.platform.win32.keyboard import Win32KeyboardController
+from atlas.platform.win32.system import Win32SystemController
+from atlas.platform.win32.windowing import Win32WindowManager
 
 requires_desktop = pytest.mark.skipif(
     os.environ.get("ATLAS_TEST_DESKTOP") != "1",
-    reason="Opens/moves real windows and touches system volume; "
-    "set ATLAS_TEST_DESKTOP=1 to run.",
+    reason="Opens/moves real windows and touches system volume; set ATLAS_TEST_DESKTOP=1 to run.",
 )
 
 

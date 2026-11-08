@@ -39,7 +39,7 @@ def test_open_unknown_application_fails():
 def test_open_falls_back_to_configured_folder(tmp_path, monkeypatch):
     opened: list[str] = []
     monkeypatch.setattr(
-        "atlas.commands.application_commands.os.startfile", lambda path: opened.append(path)
+        "atlas.commands.application_commands.open_path", lambda path: opened.append(path)
     )
     context, _, _ = make_context()
     context.config.folders["unknownapp"] = str(tmp_path)

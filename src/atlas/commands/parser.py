@@ -73,6 +73,12 @@ class CommandParser:
     ) -> None:
         self._pattern_grammars.append((compile_pattern(command_name, template), param_builder))
 
+    def exact_phrases(self) -> list[str]:
+        return [phrase for grammar in self._grammars for phrase in grammar.phrases]
+
+    def pattern_templates(self) -> list[str]:
+        return [grammar.template for grammar, _ in self._pattern_grammars]
+
     def add_custom_matcher(self, matcher: CustomMatcher) -> None:
         self._custom_matchers.append(matcher)
 

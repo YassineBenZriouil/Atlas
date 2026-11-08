@@ -26,9 +26,7 @@ class PluginRegistry:
         self._records: dict[str, PluginRecord] = {}
 
     def mark_loaded(self, plugin: AtlasPlugin) -> None:
-        self._records[plugin.name] = PluginRecord(
-            plugin.name, PluginStatus.LOADED, instance=plugin
-        )
+        self._records[plugin.name] = PluginRecord(plugin.name, PluginStatus.LOADED, instance=plugin)
 
     def mark_disabled(self, name: str, reason: str) -> None:
         self._records[name] = PluginRecord(name, PluginStatus.DISABLED, reason=reason)

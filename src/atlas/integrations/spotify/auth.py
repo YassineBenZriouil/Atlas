@@ -1,5 +1,5 @@
 """Spotify OAuth - Authorization Code flow (Atlas.md sections 27, 59). Run
-once interactively (`atlas --spotify-login`); after that ATLAS holds only
+once interactively (`atlas spotify-login`); after that ATLAS holds only
 a refresh token (atlas.integrations.spotify.token_store) and renews access
 tokens silently. Never circumvents Spotify's own authentication."""
 

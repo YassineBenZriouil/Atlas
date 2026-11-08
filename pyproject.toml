@@ -18,10 +18,18 @@ dependencies = [
     "pycaw>=20240210; sys_platform == 'win32'",
     "requests>=2.31",
     "python-dotenv>=1.0",
+    "winrt-runtime>=4.1.0 ; sys_platform == 'win32'",
+    "winrt-windows-media-speechrecognition>=4!10.0.28000.2957 ; sys_platform == 'win32'",
+    "winrt-windows-foundation>=4!10.0.28000.2957 ; sys_platform == 'win32'",
+    "winrt-windows-foundation-collections>=4!10.0.28000.2957 ; sys_platform == 'win32'",
+    "winrt-windows-globalization>=4!10.0.28000.2957 ; sys_platform == 'win32'",
 ]
 
 [project.scripts]
 atlas = "atlas.__main__:main"
+
+[project.gui-scripts]
+atlas-gui = "atlas.ui.window:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 
-CURRENT_CONFIG_VERSION = 1
+CURRENT_CONFIG_VERSION = 2
 
 
 @dataclass
@@ -16,9 +17,15 @@ class AudioConfig:
 
 @dataclass
 class SpeechConfig:
-    engine: str = "vosk"
+    # "windows" = the Win+H recognizer (no model; needs online speech recognition on).
+    # "vosk" = offline; uses `providers` below after the wake word.
+    engine: str = "windows" if sys.platform == "win32" else "vosk"
     model_path: str = ""
     language: str = "en-us"
+    # Vosk engine only: tried in order after the wake word; Vosk is the implicit last fallback.
+    providers: list[str] = field(default_factory=lambda: ["native", "cloud"])
+    cloud_url: str = "https://api.openai.com/v1/audio/transcriptions"
+    cloud_model: str = "whisper-1"
 
 
 @dataclass

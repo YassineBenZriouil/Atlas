@@ -1,6 +1,6 @@
 @echo off
 rem One-command dev startup: sync dependencies, run colored diagnostics,
-rem then start the tray application. Run from the repo root (works in
+rem then open the ATLAS window (starting the background core). Run from the repo root (works in
 rem both cmd.exe and PowerShell - unlike a .ps1, this isn't affected by
 rem PowerShell's script execution policy):
 rem
@@ -14,6 +14,10 @@ if errorlevel 1 (
 )
 
 echo.
-echo ==^> Starting ATLAS ^(diagnostics + tray^)...
-uv run atlas --start
+echo ==^> Diagnostics...
+uv run atlas diagnose
+
+echo.
+echo ==^> Starting ATLAS...
+uv run atlas start
 exit /b %errorlevel%

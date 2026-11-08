@@ -1,6 +1,6 @@
 """Real, read-only Win32 calls - safe to run in every test session."""
 
-from atlas.windows.monitors import Win32MonitorManager
+from atlas.platform.win32.monitors import Win32MonitorManager
 
 
 def test_list_monitors_returns_at_least_one():

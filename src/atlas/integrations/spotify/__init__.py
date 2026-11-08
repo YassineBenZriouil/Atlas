@@ -30,7 +30,7 @@ class SpotifyPlugin(AtlasPlugin):
                 "ATLAS_SPOTIFY_CLIENT_ID/ATLAS_SPOTIFY_CLIENT_SECRET not set (see .env.example)"
             )
         if load_refresh_token() is None:
-            raise RuntimeError("Spotify not authenticated; run `atlas --spotify-login`")
+            raise RuntimeError("Spotify not authenticated; run `atlas spotify-login`")
         self._client = SpotifyClient(client_id, client_secret)
 
     def register_commands(self, registry: CommandRegistry) -> None:

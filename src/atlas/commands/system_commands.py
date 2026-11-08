@@ -18,8 +18,8 @@ from atlas.commands.command import (
 from atlas.commands.matcher import Grammar
 from atlas.commands.parser import CommandParser
 from atlas.commands.registry import CommandRegistry
+from atlas.platform.system import SystemController
 from atlas.utils.paths import get_app_data_dir
-from atlas.windows.system import SystemController
 
 
 def _system(context: CommandContext) -> SystemController:
@@ -173,9 +173,7 @@ class TakeScreenshotCommand(Command):
         return ValidationResult.success()
 
     def execute(self, context: CommandContext) -> CommandResult:
-        destination = (
-            get_app_data_dir() / "screenshots" / f"{datetime.now():%Y%m%d-%H%M%S}.png"
-        )
+        destination = get_app_data_dir() / "screenshots" / f"{datetime.now():%Y%m%d-%H%M%S}.png"
         path = _system(context).take_screenshot(destination)
         return CommandResult.ok(f"Screenshot saved to {path}", path=str(path))
 
@@ -213,9 +211,7 @@ def _volume_level_builder(groups: dict[str, str]) -> dict[str, int]:
 def register_grammars(parser: CommandParser) -> None:
     parser.add_grammar(Grammar("mute", ("mute",)))
     parser.add_grammar(Grammar("unmute", ("unmute",)))
-    parser.add_grammar(
-        Grammar("volume_up", ("volume up", "increase volume", "turn up the volume"))
-    )
+    parser.add_grammar(Grammar("volume_up", ("volume up", "increase volume", "turn up the volume")))
     parser.add_grammar(
         Grammar("volume_down", ("volume down", "decrease volume", "turn down the volume"))
     )

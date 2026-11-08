@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 APP_NAME = "Atlas"
 
 
 def get_app_data_dir() -> Path:
-    """Return %APPDATA%\\Atlas, creating it if necessary."""
-    base = os.environ.get("APPDATA")
-    root = Path(base) if base else Path.home() / "AppData" / "Roaming"
+    """The per-user data directory, created if necessary: %APPDATA%\\Atlas on
+    Windows, ~/Library/Application Support/Atlas on macOS, and
+    $XDG_DATA_HOME/Atlas (default ~/.local/share/Atlas) elsewhere."""
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA")
+        root = Path(base) if base else Path.home() / "AppData" / "Roaming"
+    elif sys.platform == "darwin":
+        root = Path.home() / "Library" / "Application Support"
+    else:
+        base = os.environ.get("XDG_DATA_HOME")
+        root = Path(base) if base else Path.home() / ".local" / "share"
     path = root / APP_NAME
     path.mkdir(parents=True, exist_ok=True)
     return path

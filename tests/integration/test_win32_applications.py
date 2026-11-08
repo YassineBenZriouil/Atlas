@@ -6,8 +6,8 @@ from unittest.mock import patch
 from atlas.commands.application_commands import _display_name
 from atlas.config.defaults import default_config
 from atlas.config.schema import ApplicationEntry
-from atlas.windows.applications import Win32ApplicationManager
-from atlas.windows.windows import Win32WindowManager
+from atlas.platform.win32.applications import Win32ApplicationManager
+from atlas.platform.win32.windowing import Win32WindowManager
 
 
 def make_manager() -> Win32ApplicationManager:
@@ -50,7 +50,7 @@ def test_resolve_alias_fuzzy_matches_doubled_letter():
 
 
 def test_resolve_alias_fuzzy_does_not_match_command_verbs():
-    """"close" must never resolve to "code" via fuzzy matching - that
+    """ "close" must never resolve to "code" via fuzzy matching - that
     would be a command verb accidentally being treated as an app name."""
     assert make_manager().resolve_alias("close") is None
 
@@ -127,10 +127,64 @@ def test_launch_uwp_target_uses_shell_apps_folder():
     config.applications["notepad"].executable = "uwp:Microsoft.WindowsNotepad_8wekyb3d8bbwe!App"
     manager = Win32ApplicationManager(config, Win32WindowManager())
 
-    with patch("atlas.windows.applications.subprocess.Popen") as mock_popen:
+    with patch("atlas.platform.win32.applications.subprocess.Popen") as mock_popen:
         manager.launch("notepad")
 
     mock_popen.assert_called_once_with(
         ["explorer.exe", "shell:AppsFolder\\Microsoft.WindowsNotepad_8wekyb3d8bbwe!App"],
         shell=False,
     )
+
+
+TERMINAL_EXE = (
+    "C:/Program Files/WindowsApps/"
+    "Microsoft.WindowsTerminal_1.24.12741.0_x64__8wekyb3d8bbwe/WindowsTerminal.exe"
+)
+
+
+def terminal_manager():
+    from tests.fixtures.fakes import FakeWindowManager
+
+    from atlas.platform.windowing import WindowHandle
+
+    config = default_config()
+    config.applications["terminal"].executable = "uwp:Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
+    windows = FakeWindowManager()
+
+    def add(handle: int, title: str, path: str) -> None:
+        windows.windows[handle] = WindowHandle(handle, title, path.rsplit("/", 1)[-1], path)
+
+    return Win32ApplicationManager(config, windows), windows, add
+
+
+def test_store_app_windows_are_found_by_package_folder_whatever_the_title():
+    manager, _, add = terminal_manager()
+    add(1, "Windows PowerShell", TERMINAL_EXE)
+    add(2, "Some other app", "C:/Program Files/Other/other.exe")
+    add(3, "Lookalike", TERMINAL_EXE.replace("8wekyb3d8bbwe", "someoneelse"))
+    assert [w.handle for w in manager.windows_for("terminal")] == [1]
+
+
+def test_with_several_windows_the_one_atlas_opened_comes_first():
+    manager, windows, add = terminal_manager()
+    add(1, "Windows PowerShell", TERMINAL_EXE)  # front-most, already open
+    assert [w.handle for w in manager.windows_for("terminal")] == [1]  # most recently used
+
+    with patch("atlas.platform.win32.applications.subprocess.Popen"):
+        manager.launch("terminal")
+    add(2, "Windows PowerShell", TERMINAL_EXE)  # the new window, listed behind
+    assert [w.handle for w in manager.windows_for("terminal")] == [2, 1]
+
+    del windows.windows[2]  # closed again -> back to most recently used
+    assert [w.handle for w in manager.windows_for("terminal")] == [1]
+
+
+def test_close_closes_only_the_chosen_window():
+    manager, windows, add = terminal_manager()
+    add(1, "Windows PowerShell", TERMINAL_EXE)
+    with patch("atlas.platform.win32.applications.subprocess.Popen"):
+        manager.launch("terminal")
+    add(2, "Windows PowerShell", TERMINAL_EXE)
+    manager.terminate("terminal")
+    assert [w.handle for name, w in windows.calls if name == "close"] == [2]
+    assert 1 in windows.windows  # the window you were already using stays open

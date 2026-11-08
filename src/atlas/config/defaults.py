@@ -1,7 +1,7 @@
 """Default application aliases and folders shipped with a fresh install.
 
 Executables are left empty for anything not guaranteed to be on PATH -
-`atlas --discover-apps` (atlas.windows.discovery) fills in the real path
+`atlas discover-apps` (the platform backend's discovery) fills in the real path
 for whatever's actually installed on this machine without disturbing
 these hand-picked alias lists."""
 
@@ -22,9 +22,7 @@ def default_config() -> AtlasConfig:
         "settings": ApplicationEntry(executable="", aliases=["settings", "setting", "set"]),
         "notepad": ApplicationEntry(executable="", aliases=["notepad", "notes", "note"]),
         "terminal": ApplicationEntry(executable="", aliases=["terminal", "term"]),
-        "explorer": ApplicationEntry(
-            executable="", aliases=["file explorer", "explorer", "files"]
-        ),
+        "explorer": ApplicationEntry(executable="", aliases=["file explorer", "explorer", "files"]),
         "steam": ApplicationEntry(executable="", aliases=["steam"]),
     }
     config.folders = {}

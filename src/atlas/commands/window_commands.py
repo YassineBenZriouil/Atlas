@@ -17,10 +17,10 @@ from atlas.commands.command import (
 )
 from atlas.commands.parser import CommandParser, NeedsClarification, ParamBuilder
 from atlas.commands.registry import CommandRegistry
+from atlas.platform.applications import ApplicationManager
+from atlas.platform.monitors import MonitorManager
+from atlas.platform.windowing import Rect, WindowManager
 from atlas.utils.strings import words_to_numbers
-from atlas.windows.applications import ApplicationManager
-from atlas.windows.monitors import MonitorManager
-from atlas.windows.windows import Rect, WindowManager
 
 _DIRECTIONS = ("left", "right", "up", "down")
 _MOVE_STEP = 80

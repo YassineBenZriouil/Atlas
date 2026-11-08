@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from collections.abc import Callable
 
 from atlas import __version__
 from atlas.application.app import Application
@@ -37,39 +38,37 @@ def _print_diagnostics(results: list[CheckResult]) -> None:
         print(line)
 
 
+# name -> help text; every command is `atlas <name>` (handlers in _COMMAND_HANDLERS).
+COMMANDS: dict[str, str] = {
+    "start": "Run ATLAS: open the window (starts the background core if needed)",
+    "stop": "Stop the background core (voice stops too)",
+    "status": "Show whether the core is running, voice state and speech engine",
+    "reload": "Make the running core re-read its configuration",
+    "console": "Type commands as text instead of speaking them",
+    "diagnose": "Check what's working (colored PASS/WARN/FAIL)",
+    "discover-apps": "Scan installed applications and add them to config",
+    "list-plugins": "List plugins and why any are disabled",
+    "list-devices": "List microphones",
+    "list-monitors": "List monitors",
+    "list-windows": "List open windows",
+    "test-microphone": "Record 2 seconds to check the microphone",
+    "test-speech": "Check the Vosk speech model loads",
+    "spotify-login": "Connect a Spotify account",
+    "spotify-logout": "Forget the stored Spotify account",
+    "core": "Run the core in the foreground (what `atlas start` runs in the background)",
+    "version": "Print the version",
+}
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="atlas", description="ATLAS voice assistant")
-    parser.add_argument("--version", action="store_true", help="Print the version and exit")
-    parser.add_argument("--diagnose", action="store_true", help="Run diagnostics and exit")
-    parser.add_argument("--test-microphone", action="store_true")
-    parser.add_argument("--test-speech", action="store_true")
-    parser.add_argument("--list-devices", action="store_true")
-    parser.add_argument("--list-monitors", action="store_true")
-    parser.add_argument("--list-windows", action="store_true")
-    parser.add_argument("--list-plugins", action="store_true")
-    parser.add_argument(
-        "--discover-apps",
-        action="store_true",
-        help="Scan installed applications (Start Menu + Store apps) and add them to config",
+    parser = argparse.ArgumentParser(
+        prog="atlas",
+        description="ATLAS voice assistant. Run it with: atlas start",
     )
-    parser.add_argument("--reload", action="store_true")
-    parser.add_argument("--tray", action="store_true", help="Start the tray application")
-    parser.add_argument(
-        "--start",
-        action="store_true",
-        help="Run diagnostics (colored PASS/WARN/FAIL), then start the tray application",
-    )
-    parser.add_argument(
-        "--console",
-        action="store_true",
-        help="Type commands as text instead of speaking them (for testing without voice)",
-    )
-    parser.add_argument(
-        "--spotify-login", action="store_true", help="Run the Spotify OAuth sign-in flow"
-    )
-    parser.add_argument(
-        "--spotify-logout", action="store_true", help="Forget stored Spotify credentials"
-    )
+    parser.add_argument("--version", action="version", version=f"ATLAS {__version__}")
+    subparsers = parser.add_subparsers(dest="command", metavar="<command>")
+    for name, help_text in COMMANDS.items():
+        subparsers.add_parser(name, help=help_text, description=help_text)
     return parser
 
 
@@ -89,18 +88,18 @@ def _list_devices() -> int:
 
 
 def _list_monitors() -> int:
-    from atlas.windows.monitors import Win32MonitorManager
+    from atlas.platform import get_backend
 
-    for monitor in Win32MonitorManager().list_monitors():
+    for monitor in get_backend().monitor_manager().list_monitors():
         primary = " (primary)" if monitor.is_primary else ""
         print(f"#{monitor.index} {monitor.name}{primary} bounds={monitor.bounds}")
     return 0
 
 
 def _list_windows() -> int:
-    from atlas.windows.windows import Win32WindowManager
+    from atlas.platform import get_backend
 
-    for window in Win32WindowManager().list_windows():
+    for window in get_backend().window_manager().list_windows():
         print(f"{window.process_name}: {window.title}")
     return 0
 
@@ -152,15 +151,16 @@ def _test_speech() -> int:
 
 def _discover_apps() -> int:
     from atlas.config.loader import save_config
+    from atlas.platform import get_backend
+    from atlas.platform.discovery import merge_discovered_apps
     from atlas.utils.paths import get_config_path
-    from atlas.windows.discovery import discover_installed_applications, merge_discovered_apps
 
     app = Application()
     app.bootstrap()
     assert app.config is not None
 
-    print("Scanning Start Menu shortcuts and Store apps...")
-    discovered = discover_installed_applications()
+    print("Scanning installed applications...")
+    discovered = get_backend().discover_applications()
     result = merge_discovered_apps(app.config, discovered)
 
     if result.updated:
@@ -241,81 +241,39 @@ def _run_console(app: Application) -> int:
     return 0
 
 
-def _run_tray(app: Application) -> int:
-    """Wires the tray's callback-based interface (Atlas.md section 34) to a
-    real Application - kept out of atlas.ui.tray itself so that module
-    stays free of business logic, per its own docstring."""
-    from atlas.ui.tray import TrayApplication
+def _open_window() -> int:
+    """`atlas start`: start the background core if needed and open the
+    window. Closing the window leaves the core running."""
+    from atlas.ui.window import run_window
 
-    assert app.config is not None
-    state: dict[str, object] = {}
+    return run_window()
 
-    def enable_voice() -> None:
-        if "loop" in state:
-            logger.info("Voice already enabled")
-            return
-        from atlas.application.voice_loop import VoiceLoop
-        from atlas.speech.vosk_engine import find_default_model
 
-        assert app.config is not None
-        model_path = find_default_model(app.config.speech.model_path)
-        if model_path is None:
-            logger.warning("Cannot enable voice: no Vosk model found (see models/README.md)")
-            return
+def _control_core(command: str) -> int:
+    from atlas.service.client import CoreApiError, CoreUnavailableError, connect
 
-        loop = VoiceLoop(
-            app,
-            model_path=str(model_path),
-            device_id=app.config.audio.device,
-            sample_rate=app.config.audio.sample_rate,
-            wake_phrase=app.config.wake.phrase,
-            listen_timeout_seconds=app.config.wake.timeout_seconds,
-            # Audio callbacks run on a background thread - never touch Qt
-            # widgets from here, just log.
-            on_event=lambda kind, message: logger.info("voice: %s - %s", kind, message),
-        )
-        loop.start()
-        state["loop"] = loop
-        logger.info("Voice enabled")
-
-    def disable_voice() -> None:
-        loop = state.pop("loop", None)
-        if loop is not None:
-            loop.stop()  # type: ignore[attr-defined]
-        logger.info("Voice disabled")
-
-    def open_settings() -> None:
-        from atlas.ui.settings import SettingsDialog
-
-        SettingsDialog().exec()
-
-    def open_logs() -> None:
-        import os
-
-        from atlas.utils.paths import get_log_dir
-
-        os.startfile(str(get_log_dir()))  # noqa: S606 - fixed, known-safe path
-
-    def reload_config() -> None:
-        logger.info("Reload requested; not yet implemented (Phase 3)")
-
-    def test_microphone() -> None:
-        _test_microphone()
-
-    def test_speech() -> None:
-        _test_speech()
-
-    tray = TrayApplication(
-        on_enable_voice=enable_voice,
-        on_disable_voice=disable_voice,
-        on_test_microphone=test_microphone,
-        on_test_speech=test_speech,
-        on_open_settings=open_settings,
-        on_open_logs=open_logs,
-        on_reload=reload_config,
-        on_exit=lambda: sys.exit(0),
-    )
-    return tray.run()
+    client = connect()
+    if client is None:
+        print("ATLAS core is not running. Start it with: atlas start")
+        return 1
+    try:
+        if command == "stop":
+            client.quit()
+            print("ATLAS core stopped.")
+        elif command == "reload":
+            client.reload()
+            print("Configuration reloaded.")
+        else:
+            status = client.status()
+            voice = status["voice"]
+            print(f"ATLAS {status['version']} core - pid {status['pid']}, port {client.info.port}")
+            print(f"Voice: {'on' if voice['enabled'] else 'off'} {voice['error']}".rstrip())
+            print(f"Speech providers: {' -> '.join(status['speech_providers'])}")
+            print(f"Wake phrase: {status['wake_phrase']}")
+    except (CoreUnavailableError, CoreApiError) as exc:
+        print(exc)
+        return 1
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -326,69 +284,72 @@ def main(argv: list[str] | None = None) -> int:
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
 
-    args = build_parser().parse_args(argv)
-
-    if args.version:
-        print(f"ATLAS {__version__}")
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
         return 0
+    from atlas.platform import PlatformNotSupportedError
 
-    if args.diagnose:
-        _print_diagnostics(run_diagnostics())
-        return 0
+    try:
+        return _COMMAND_HANDLERS[args.command]()
+    except PlatformNotSupportedError as exc:
+        print(exc)
+        return 1
 
-    if args.start:
-        _print_diagnostics(run_diagnostics())
-        print()
-        app = Application()
-        app.bootstrap()
-        return _run_tray(app)
 
-    if args.list_plugins:
-        app = Application()
-        app.bootstrap()
-        records = app.plugin_registry.all()
-        if not records:
-            print("No plugins discovered.")
-        for record in records:
-            print(f"{record.name}: {record.status.name} {record.reason}".rstrip())
-        return 0
+def _version() -> int:
+    print(f"ATLAS {__version__}")
+    return 0
 
-    if args.test_microphone:
-        return _test_microphone()
-    if args.test_speech:
-        return _test_speech()
-    if args.list_devices:
-        return _list_devices()
-    if args.list_monitors:
-        return _list_monitors()
-    if args.list_windows:
-        return _list_windows()
-    if args.discover_apps:
-        return _discover_apps()
-    if args.spotify_login:
-        return _spotify_login()
-    if args.spotify_logout:
-        return _spotify_logout()
-    if args.reload:
-        print(
-            "Live reload requires signalling an already-running ATLAS process; "
-            "not yet implemented (Phase 3)."
-        )
-        return 0
 
+def _diagnose() -> int:
+    _print_diagnostics(run_diagnostics())
+    return 0
+
+
+def _list_plugins() -> int:
     app = Application()
     app.bootstrap()
-
-    if args.console:
-        return _run_console(app)
-    if args.tray:
-        return _run_tray(app)
-
-    print(
-        "ATLAS foundation initialized. "
-        "Use --tray to start the tray application, or --diagnose to run diagnostics."
-    )
+    records = app.plugin_registry.all()
+    if not records:
+        print("No plugins discovered.")
+    for record in records:
+        print(f"{record.name}: {record.status.name} {record.reason}".rstrip())
     return 0
+
+
+def _console() -> int:
+    app = Application()
+    app.bootstrap()
+    return _run_console(app)
+
+
+def _core() -> int:
+    from atlas.service.server import run_core
+
+    return run_core()
+
+
+_COMMAND_HANDLERS: dict[str, Callable[[], int]] = {
+    "start": _open_window,
+    "stop": lambda: _control_core("stop"),
+    "status": lambda: _control_core("status"),
+    "reload": lambda: _control_core("reload"),
+    "console": _console,
+    "diagnose": _diagnose,
+    "discover-apps": _discover_apps,
+    "list-plugins": _list_plugins,
+    "list-devices": _list_devices,
+    "list-monitors": _list_monitors,
+    "list-windows": _list_windows,
+    "test-microphone": _test_microphone,
+    "test-speech": _test_speech,
+    "spotify-login": _spotify_login,
+    "spotify-logout": _spotify_logout,
+    "core": _core,
+    "version": _version,
+}
 
 
 if __name__ == "__main__":

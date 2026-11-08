@@ -24,5 +24,3 @@ def launch_executable(executable: Path | str, args: list[str] | None = None) -> 
         return subprocess.Popen([str(path), *(args or [])], shell=False)
     except OSError as exc:
         raise ProcessLaunchError(f"Failed to launch {path}: {exc}") from exc
-
-

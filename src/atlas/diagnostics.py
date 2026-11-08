@@ -1,4 +1,4 @@
-"""`atlas --diagnose` (Atlas.md section 37). Exercises everything that
+"""`atlas diagnose` (Atlas.md section 37). Exercises everything that
 exists today for real; only Spotify authentication remains unimplemented."""
 
 from __future__ import annotations
@@ -58,31 +58,33 @@ def run_diagnostics() -> list[CheckResult]:
     results.append(_check_monitor_detection())
     results.append(_check_application_discovery(app))
     results.append(_check_microphone())
-    results.append(_check_speech_model(app))
-    results.append(_check_wake_detector(app))
+    if app.config is not None and app.config.speech.engine != "vosk":
+        results.append(_check_os_speech(app.config.speech.engine))
+    else:
+        results.append(_check_speech_model(app))
+        results.append(_check_wake_detector(app))
+        results.append(_check_speech_providers(app))
     results.append(_check_tts())
-    results.append(
-        CheckResult("Spotify authentication", CheckStatus.WARN, "Not yet implemented")
-    )
+    results.append(CheckResult("Spotify authentication", CheckStatus.WARN, "Not yet implemented"))
 
     return results
 
 
 def _check_windows_api() -> CheckResult:
     try:
-        from atlas.windows.windows import Win32WindowManager
+        from atlas.platform import get_backend
 
-        count = len(Win32WindowManager().list_windows())
-        return CheckResult("Windows API", CheckStatus.PASS, f"{count} visible window(s)")
+        count = len(get_backend().window_manager().list_windows())
+        return CheckResult("Window control", CheckStatus.PASS, f"{count} visible window(s)")
     except Exception as exc:  # noqa: BLE001
-        return CheckResult("Windows API", CheckStatus.FAIL, str(exc))
+        return CheckResult("Window control", CheckStatus.FAIL, str(exc))
 
 
 def _check_monitor_detection() -> CheckResult:
     try:
-        from atlas.windows.monitors import Win32MonitorManager
+        from atlas.platform import get_backend
 
-        monitors = Win32MonitorManager().list_monitors()
+        monitors = get_backend().monitor_manager().list_monitors()
         return CheckResult("Monitor detection", CheckStatus.PASS, f"{len(monitors)} monitor(s)")
     except Exception as exc:  # noqa: BLE001
         return CheckResult("Monitor detection", CheckStatus.FAIL, str(exc))
@@ -145,6 +147,32 @@ def _check_wake_detector(app: Application) -> CheckResult:
         return CheckResult("Wake detector", CheckStatus.PASS, f"phrase: '{app.config.wake.phrase}'")
     except Exception as exc:  # noqa: BLE001
         return CheckResult("Wake detector", CheckStatus.FAIL, str(exc))
+
+
+def _check_os_speech(engine: str) -> CheckResult:
+    from atlas.platform import get_backend
+
+    name = f"Speech engine ({engine})"
+    backend = get_backend()
+    if engine not in backend.voice_engines:
+        return CheckResult(name, CheckStatus.FAIL, f"not available on {backend.name}")
+    problem = backend.speech_problem() if backend.speech_problem else ""
+    if problem:
+        return CheckResult(name, CheckStatus.WARN, problem)
+    return CheckResult(name, CheckStatus.PASS, "ready")
+
+
+def _check_speech_providers(app: Application) -> CheckResult:
+    from atlas.speech.transcriber import LOCAL_PROVIDER, create_transcriber_chain
+
+    assert app.config is not None
+    chain = create_transcriber_chain(app.config.speech)
+    order = " -> ".join([t.name for t in chain.transcribers] + [LOCAL_PROVIDER])
+    skipped = [p for p in app.config.speech.providers if p not in order.split(" -> ")]
+    detail = order + (f" (unavailable: {', '.join(skipped)})" if skipped else "")
+    return CheckResult(
+        "Speech providers", CheckStatus.WARN if skipped else CheckStatus.PASS, detail
+    )
 
 
 def _check_tts() -> CheckResult:

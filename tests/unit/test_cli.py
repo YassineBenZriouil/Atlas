@@ -1,3 +1,4 @@
+import pytest
 from tests.fixtures.fakes import (
     FakeApplicationManager,
     FakeKeyboardController,
@@ -7,7 +8,14 @@ from tests.fixtures.fakes import (
     FakeWindowManager,
 )
 
-from atlas.__main__ import _print_diagnostics, _run_console, build_parser, main
+from atlas.__main__ import (
+    _COMMAND_HANDLERS,
+    COMMANDS,
+    _print_diagnostics,
+    _run_console,
+    build_parser,
+    main,
+)
 from atlas.application.app import Application
 from atlas.diagnostics import CheckResult, CheckStatus
 
@@ -26,46 +34,56 @@ def make_fake_app() -> Application:
     return app
 
 
-def test_version_flag(capsys):
-    exit_code = main(["--version"])
-    assert exit_code == 0
+def test_version_command_and_flag(capsys):
+    assert main(["version"]) == 0
+    assert "ATLAS" in capsys.readouterr().out
+    with pytest.raises(SystemExit) as exc:
+        main(["--version"])
+    assert exc.value.code == 0
     assert "ATLAS" in capsys.readouterr().out
 
 
-def test_diagnose_flag_runs_without_crashing(capsys):
-    exit_code = main(["--diagnose"])
-    assert exit_code == 0
+def test_bare_atlas_lists_commands(capsys):
+    assert main([]) == 0
     out = capsys.readouterr().out
-    assert "Python" in out
+    assert "atlas start" in out
+    for name in COMMANDS:
+        assert name in out
 
 
-def test_list_monitors_does_not_crash(capsys):
-    exit_code = main(["--list-monitors"])
-    assert exit_code == 0
-
-
-def test_parser_accepts_all_documented_flags():
+def test_every_command_has_a_handler():
+    assert COMMANDS.keys() == _COMMAND_HANDLERS.keys()
     parser = build_parser()
-    args = parser.parse_args(
-        [
-            "--test-microphone",
-            "--test-speech",
-            "--list-devices",
-            "--list-monitors",
-            "--list-windows",
-            "--list-plugins",
-            "--reload",
-            "--tray",
-            "--start",
-            "--console",
-            "--spotify-login",
-            "--spotify-logout",
-        ]
-    )
-    assert args.test_microphone
-    assert args.tray
-    assert args.start
-    assert args.console
+    for name in COMMANDS:
+        assert parser.parse_args([name]).command == name
+
+
+def test_old_flag_style_is_rejected():
+    with pytest.raises(SystemExit):
+        main(["--start"])
+
+
+def test_diagnose_runs_without_crashing(capsys):
+    assert main(["diagnose"]) == 0
+    assert "Python" in capsys.readouterr().out
+
+
+def test_list_monitors_does_not_crash():
+    assert main(["list-monitors"]) == 0
+
+
+def test_stop_and_status_without_core_point_to_atlas_start(capsys):
+    assert main(["status"]) == 1
+    assert "atlas start" in capsys.readouterr().out
+
+
+def test_detached_core_launches_the_core_subcommand(monkeypatch):
+    from atlas.service import client
+
+    launched: list[list[str]] = []
+    monkeypatch.setattr(client.subprocess, "Popen", lambda cmd, **kw: launched.append(cmd))
+    client.start_core_detached()
+    assert launched[0][-3:] == ["-m", "atlas", "core"]
 
 
 def test_print_diagnostics_plain_when_not_a_tty(monkeypatch, capsys):

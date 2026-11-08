@@ -18,9 +18,7 @@ _ENTRY_ATTRIBUTE = "PLUGIN_CLASS"
 
 
 class PluginLoader:
-    def __init__(
-        self, command_registry: CommandRegistry, plugin_registry: PluginRegistry
-    ) -> None:
+    def __init__(self, command_registry: CommandRegistry, plugin_registry: PluginRegistry) -> None:
         self._command_registry = command_registry
         self._plugin_registry = plugin_registry
 

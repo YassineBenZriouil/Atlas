@@ -32,6 +32,7 @@ class PatternGrammar:
     command_name: str
     pattern: re.Pattern[str]
     param_names: tuple[str, ...]
+    template: str = ""
 
 
 def compile_pattern(command_name: str, template: str) -> PatternGrammar:
@@ -45,7 +46,7 @@ def compile_pattern(command_name: str, template: str) -> PatternGrammar:
         else:
             regex_parts.append(re.escape(part))
     pattern = re.compile("^" + "".join(regex_parts) + "$")
-    return PatternGrammar(command_name, pattern, param_names)
+    return PatternGrammar(command_name, pattern, param_names, template)
 
 
 def match_pattern(

@@ -1,6 +1,6 @@
 from atlas.config.defaults import default_config
 from atlas.config.schema import ApplicationEntry
-from atlas.windows.discovery import DiscoveredApp, _slugify, merge_discovered_apps
+from atlas.platform.discovery import DiscoveredApp, _slugify, merge_discovered_apps
 
 
 def test_slugify_strips_non_alphanumerics():

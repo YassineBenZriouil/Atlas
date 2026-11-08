@@ -19,7 +19,7 @@ from atlas.commands.command import (
 from atlas.commands.matcher import Grammar
 from atlas.commands.parser import CommandParser
 from atlas.commands.registry import CommandRegistry
-from atlas.windows.windows import WindowHandle, WindowManager
+from atlas.platform.windowing import WindowHandle, WindowManager
 
 _BROWSER_PROCESS_NAMES = ("brave.exe", "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe")
 _DEFAULT_SEARCH_URL = "https://www.google.com/search?q={query}"

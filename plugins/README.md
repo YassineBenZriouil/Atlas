@@ -6,7 +6,7 @@ Drop a plugin here as either:
 - `plugins/<name>.py` (a single module)
 
 exposing a module-level `PLUGIN_CLASS` that points at a class implementing
-`atlas.plugins.base.AtlasPlugin`. See `docs/plugins.md` for the interface and
+`atlas.plugins.base.AtlasPlugin`. See `docs/PLUGINS.md` for the interface and
 `tests/fixtures/plugins/` for working examples.
 
 ATLAS discovers and loads everything in this directory at startup. A plugin

@@ -49,7 +49,7 @@ class SpotifyClient:
         refresh_token = load_refresh_token()
         if not refresh_token:
             raise SpotifyNotAuthenticatedError(
-                "Spotify is not connected. Run `atlas --spotify-login` first."
+                "Spotify is not connected. Run `atlas spotify-login` first."
             )
 
         response = requests.post(
@@ -95,9 +95,7 @@ class SpotifyClient:
         self._request("POST", "/me/player/previous")
 
     def search_track(self, query: str) -> dict[str, Any] | None:
-        response = self._request(
-            "GET", "/search", params={"q": query, "type": "track", "limit": 1}
-        )
+        response = self._request("GET", "/search", params={"q": query, "type": "track", "limit": 1})
         items = response.json().get("tracks", {}).get("items", [])
         return items[0] if items else None
 

@@ -29,7 +29,7 @@ You are allowed to make implementation decisions where this specification leaves
 
 1. No generative AI.
 2. No LLM.
-3. No cloud-based speech recognition.
+3. No cloud-based speech recognition by default. (Amended, see docs/ROADMAP.md: an opt-in cloud API is allowed as a fallback after the OS-native recognizer, never for wake-word listening.)
 4. No mandatory paid service.
 5. No telemetry by default.
 6. No unnecessary dependencies.
@@ -301,13 +301,13 @@ atlas/
 ├── .env.example
 │
 ├── docs/
-│   ├── architecture.md
-│   ├── commands.md
-│   ├── plugins.md
-│   ├── configuration.md
-│   ├── development.md
-│   ├── troubleshooting.md
-│   └── security.md
+│   ├── ARCHITECTURE.md
+│   ├── COMMANDS.md
+│   ├── PLUGINS.md
+│   ├── CONFIGURATION.md
+│   ├── DEVELOPMENT.md
+│   ├── TROUBLESHOOTING.md
+│   └── SECURITY.md
 │
 ├── src/
 │   └── atlas/

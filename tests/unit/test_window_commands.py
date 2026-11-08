@@ -12,7 +12,7 @@ from atlas.commands.window_commands import (
     register_grammars,
 )
 from atlas.config.defaults import default_config
-from atlas.windows.windows import Rect
+from atlas.platform.windowing import Rect
 
 
 def make_context():

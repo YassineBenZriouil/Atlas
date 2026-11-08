@@ -5,12 +5,17 @@ down/restarting the machine when testing the confirmation flow)."""
 
 from __future__ import annotations
 
-from atlas.windows.applications import ApplicationInfo, ApplicationManager, ApplicationNotFoundError
-from atlas.windows.keyboard import KeyboardController, key_to_vk
-from atlas.windows.monitors import Monitor, MonitorManager
-from atlas.windows.mouse import MouseController
-from atlas.windows.system import SystemController
-from atlas.windows.windows import Rect, WindowHandle, WindowManager
+from atlas.platform.applications import (
+    ApplicationInfo,
+    ApplicationManager,
+    ApplicationNotFoundError,
+)
+from atlas.platform.keyboard import KeyboardController, validate_key
+from atlas.platform.monitors import Monitor, MonitorManager
+from atlas.platform.mouse import MouseController
+from atlas.platform.secrets import SecretStore
+from atlas.platform.system import SystemController
+from atlas.platform.windowing import Rect, WindowHandle, WindowManager
 
 
 class FakeWindowManager(WindowManager):
@@ -20,9 +25,7 @@ class FakeWindowManager(WindowManager):
         self.calls: list[tuple] = []
         self._next_handle = 1
 
-    def add_window(
-        self, title: str, process_name: str, rect: Rect | None = None
-    ) -> WindowHandle:
+    def add_window(self, title: str, process_name: str, rect: Rect | None = None) -> WindowHandle:
         handle = WindowHandle(handle=self._next_handle, title=title, process_name=process_name)
         self._next_handle += 1
         self.windows[handle.handle] = handle
@@ -118,20 +121,20 @@ class FakeMonitorManager(MonitorManager):
 
 
 class FakeKeyboardController(KeyboardController):
-    """Still validates keys via the real key_to_vk table, so a test using
-    an unmappable key fails the same way the real controller would."""
+    """Still validates key names (validate_key), so a test using an
+    unknown key fails the same way a real controller would."""
 
     def __init__(self) -> None:
         self.pressed: list[str] = []
         self.combos: list[list[str]] = []
 
     def press_key(self, key: str) -> None:
-        key_to_vk(key)
+        validate_key(key)
         self.pressed.append(key)
 
     def press_combo(self, keys: list[str]) -> None:
         for key in keys:
-            key_to_vk(key)
+            validate_key(key)
         self.combos.append(list(keys))
 
 
@@ -202,3 +205,17 @@ class FakeSystemController(SystemController):
         destination.write_bytes(b"fake-png")
         self.calls.append(("screenshot", destination))
         return destination
+
+
+class FakeSecretStore(SecretStore):
+    def __init__(self) -> None:
+        self.secrets: dict[str, str] = {}
+
+    def save(self, name: str, secret: str) -> None:
+        self.secrets[name] = secret
+
+    def load(self, name: str) -> str | None:
+        return self.secrets.get(name)
+
+    def delete(self, name: str) -> None:
+        self.secrets.pop(name, None)

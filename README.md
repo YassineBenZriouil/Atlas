@@ -19,7 +19,7 @@ screenshot, keyboard shortcuts, browser tab control, folder opening,
 optional Spotify playback). Multi-turn clarification ("Move Brave." ->
 "Which monitor?") and the confirmation gate for dangerous commands
 (shutdown/restart) both work end-to-end. Not yet done: the macro engine
-and a real settings UI - see `docs/commands.md` for the exact command
+and a real settings UI - see `docs/COMMANDS.md` for the exact command
 list.
 
 ## Requirements
@@ -39,14 +39,33 @@ uv sync
 
 ## Running
 
+Every command is `atlas <command>`. Inside the repo you can prefix them
+with `uv run` (`uv run atlas start`); to type plain `atlas` from any
+terminal, install it once as a uv tool (editable, so code changes apply
+immediately):
+
 ```powershell
-uv run atlas --diagnose      # check what's working
-uv run atlas --discover-apps  # scan installed apps (Start Menu + Store) and add them to config
-uv run atlas --console       # type commands as text (no mic/wake word needed - good for testing)
-uv run atlas --tray          # start the tray application (voice via "Enable voice")
-uv run atlas --spotify-login # optional: connect a Spotify account (see docs/plugins.md)
-uv run atlas --help          # see all developer flags
+uv tool install --editable .
+uv tool update-shell   # once, if uv says its tool folder isn't on PATH
 ```
+
+```powershell
+atlas start           # run ATLAS: opens the window (starts the background core if needed)
+atlas stop            # stop the background core
+atlas status          # is it running, is voice on, which speech engine
+atlas reload          # re-read config.toml
+atlas diagnose        # check what's working
+atlas discover-apps   # scan installed apps (Start Menu + Store) and add them to config
+atlas console         # type commands as text (no mic/wake word needed - good for testing)
+atlas spotify-login   # optional: connect a Spotify account (see docs/PLUGINS.md)
+atlas                 # list every command
+```
+
+Voice uses Windows' own built-in speech recognition, offline - no model
+download, no account, nothing to turn on. Say "Atlas", pause a moment,
+then your command. Closing the window keeps ATLAS listening; use
+"Quit ATLAS" in the window (or `atlas stop`) to stop it.
+`.venv\Scripts\atlas-gui.exe` opens the window without a console.
 
 ## Testing
 
@@ -58,13 +77,14 @@ uv run mypy src
 
 ## Documentation
 
-- [`docs/architecture.md`](docs/architecture.md)
-- [`docs/commands.md`](docs/commands.md)
-- [`docs/plugins.md`](docs/plugins.md)
-- [`docs/configuration.md`](docs/configuration.md)
-- [`docs/development.md`](docs/development.md)
-- [`docs/troubleshooting.md`](docs/troubleshooting.md)
-- [`docs/security.md`](docs/security.md)
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) - current 4-phase plan
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/COMMANDS.md`](docs/COMMANDS.md)
+- [`docs/PLUGINS.md`](docs/PLUGINS.md)
+- [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
+- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
+- [`docs/SECURITY.md`](docs/SECURITY.md)
 
 ## License
 

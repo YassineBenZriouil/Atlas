@@ -8,7 +8,6 @@ so an unresolvable name surfaces as a normal execution failure
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
 from atlas.commands.command import (
@@ -21,8 +20,9 @@ from atlas.commands.command import (
 from atlas.commands.parser import CommandParser
 from atlas.commands.registry import CommandRegistry
 from atlas.integrations.filesystem.folders import resolve_folder
-from atlas.windows.applications import ApplicationManager, ApplicationNotFoundError
-from atlas.windows.windows import WindowHandle, WindowManager
+from atlas.platform import open_path
+from atlas.platform.applications import ApplicationManager, ApplicationNotFoundError
+from atlas.platform.windowing import WindowHandle, WindowManager
 
 
 def _managers(context: CommandContext) -> tuple[ApplicationManager, WindowManager]:
@@ -49,7 +49,7 @@ def _require_window(context: CommandContext, application: str) -> WindowHandle |
 
 @dataclass
 class OpenApplicationCommand(Command):
-    """"open X" covers both applications and folders (Atlas.md sections 18,
+    """ "open X" covers both applications and folders (Atlas.md sections 18,
     23) - there is exactly one "open X" grammar, and application resolution
     is tried first, falling back to a known/configured folder. Two
     competing commands bound to the identical "open {x}" text would be
@@ -75,7 +75,7 @@ class OpenApplicationCommand(Command):
 
         folder = resolve_folder(context.config, self.application)
         if folder is not None:
-            os.startfile(str(folder))  # noqa: S606 - resolved, existing directory only
+            open_path(str(folder))  # resolved, existing directory only
             return CommandResult.ok(f"Opening {self.application}", folder=str(folder))
 
         return CommandResult.fail(f"'{self.application}' was not found")

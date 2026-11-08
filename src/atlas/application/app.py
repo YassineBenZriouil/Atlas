@@ -3,6 +3,8 @@ together (Atlas.md section 0 / section 85: "prove the architecture works")."""
 
 from __future__ import annotations
 
+import threading
+
 from atlas.application.lifecycle import CrashGuard, Lifecycle
 from atlas.application.state import AtlasState, StateMachine
 from atlas.commands import application_commands, keyboard_commands, system_commands, window_commands
@@ -18,16 +20,17 @@ from atlas.integrations.spotify import SpotifyPlugin
 from atlas.integrations.spotify import commands as spotify_commands
 from atlas.integrations.spotify.client import SpotifyClient
 from atlas.logging_setup import configure_logging, get_logger
+from atlas.platform import get_backend
+from atlas.platform.applications import ApplicationManager
+from atlas.platform.keyboard import KeyboardController
+from atlas.platform.monitors import MonitorManager
+from atlas.platform.mouse import MouseController
+from atlas.platform.system import SystemController
+from atlas.platform.windowing import WindowManager
 from atlas.plugins.loader import PluginLoader
 from atlas.plugins.registry import PluginRegistry, PluginStatus
 from atlas.utils.paths import get_config_path, get_log_dir, get_plugins_dir
 from atlas.utils.strings import normalize
-from atlas.windows.applications import ApplicationManager, Win32ApplicationManager
-from atlas.windows.keyboard import KeyboardController, Win32KeyboardController
-from atlas.windows.monitors import MonitorManager, Win32MonitorManager
-from atlas.windows.mouse import MouseController, Win32MouseController
-from atlas.windows.system import SystemController, Win32SystemController
-from atlas.windows.windows import Win32WindowManager, WindowManager
 
 logger = get_logger("application")
 
@@ -38,8 +41,8 @@ class Application:
     """Owns every subsystem's lifetime. `bootstrap()` must run before any
     other method is used.
 
-    Windows-layer managers default to the real Win32-backed
-    implementations but can be injected (e.g. in tests, to avoid actually
+    OS-layer managers default to this platform's backend
+    (atlas.platform.get_backend()) but can be injected (e.g. in tests, to avoid actually
     shutting down the machine when exercising the confirmation flow)."""
 
     def __init__(
@@ -62,19 +65,22 @@ class Application:
         self.dispatcher: CommandDispatcher | None = None
         self.plugin_loader: PluginLoader | None = None
 
-        self.window_manager: WindowManager = window_manager or Win32WindowManager()
-        self.monitor_manager: MonitorManager = monitor_manager or Win32MonitorManager()
+        backend = get_backend()
+        self.window_manager: WindowManager = window_manager or backend.window_manager()
+        self.monitor_manager: MonitorManager = monitor_manager or backend.monitor_manager()
         self.keyboard_controller: KeyboardController = (
-            keyboard_controller or Win32KeyboardController()
+            keyboard_controller or backend.keyboard_controller()
         )
-        self.mouse_controller: MouseController = mouse_controller or Win32MouseController()
-        self.system_controller: SystemController = system_controller or Win32SystemController()
+        self.mouse_controller: MouseController = mouse_controller or backend.mouse_controller()
+        self.system_controller: SystemController = system_controller or backend.system_controller()
         self._injected_application_manager = application_manager
         self.application_manager: ApplicationManager | None = application_manager
         self.spotify_client: SpotifyClient | None = None
 
         self._pending_clarification: NeedsClarification | None = None
         self._pending_confirmation: tuple[Command, CommandContext] | None = None
+        # Voice thread and core-service API threads can both submit commands.
+        self._command_lock = threading.Lock()
 
     def bootstrap(self) -> None:
         self.config = load_config(get_config_path())
@@ -86,8 +92,9 @@ class Application:
         )
         logger.info("ATLAS bootstrap starting")
 
-        self.application_manager = self._injected_application_manager or Win32ApplicationManager(
-            self.config, self.window_manager
+        self.application_manager = (
+            self._injected_application_manager
+            or get_backend().application_manager(self.config, self.window_manager)
         )
 
         register_builtin_commands(self.command_registry)
@@ -185,6 +192,11 @@ class Application:
         if self.parser is None or self.dispatcher is None or self.config is None:
             raise RuntimeError("Application.bootstrap() must be called first")
 
+        with self._command_lock:
+            return self._run_text_command_locked(text)
+
+    def _run_text_command_locked(self, text: str) -> CommandResult:
+        assert self.parser is not None and self.dispatcher is not None
         try:
             self.state_machine.transition(AtlasState.WAKE_DETECTED)
             self.state_machine.transition(AtlasState.LISTENING)
@@ -224,9 +236,7 @@ class Application:
             if not parse_result.ok:
                 self.state_machine.fail(parse_result.error or "parse failed")
                 self.state_machine.recover()
-                return CommandResult.fail(
-                    parse_result.error or "I didn't understand that command."
-                )
+                return CommandResult.fail(parse_result.error or "I didn't understand that command.")
 
             assert parse_result.command is not None
             return self._run_command(parse_result.command)

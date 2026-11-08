@@ -1,6 +1,6 @@
 """Keyboard automation commands (Atlas.md section 24): press <key> / press
 <key> <key> for combos. Key aliasing (control/ctrl, etc.) lives in
-atlas.windows.keyboard and is shared with every other command that needs
+atlas.platform.keyboard and is shared with every other command that needs
 to send keystrokes (browser shortcuts included)."""
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from atlas.commands.command import (
 )
 from atlas.commands.parser import CommandParser
 from atlas.commands.registry import CommandRegistry
-from atlas.windows.keyboard import KeyboardController, key_to_vk
+from atlas.platform.keyboard import KeyboardController, validate_key
 
 
 def _keyboard(context: CommandContext) -> KeyboardController:
@@ -34,7 +34,7 @@ class PressKeyCommand(Command):
             return ValidationResult.failure("No key specified")
         try:
             for key in self.keys:
-                key_to_vk(key)
+                validate_key(key)
         except ValueError as exc:
             return ValidationResult.failure(str(exc))
         return ValidationResult.success()

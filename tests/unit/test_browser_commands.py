@@ -10,9 +10,7 @@ from atlas.integrations.browser.commands import (
 
 
 def make_context(window_manager: FakeWindowManager, keyboard: FakeKeyboardController):
-    return CommandContext(
-        extra={"window_manager": window_manager, "keyboard_controller": keyboard}
-    )
+    return CommandContext(extra={"window_manager": window_manager, "keyboard_controller": keyboard})
 
 
 def test_new_tab_fails_when_no_browser_open():
